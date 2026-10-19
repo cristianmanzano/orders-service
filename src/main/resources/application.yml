@@ -1,0 +1,115 @@
+# Configuración base. Todo valor sensible o dependiente del entorno se inyecta por variables
+# de entorno (12-factor). Los valores por defecto apuntan al docker-compose local.
+spring:
+  application:
+    name: orders-service
+  r2dbc:
+    url: ${DB_R2DBC_URL:r2dbc:postgresql://localhost:5432/orders}
+    username: ${DB_USERNAME:orders}
+    password: ${DB_PASSWORD:orders}
+    pool:
+      initial-size: 2
+      max-size: 10
+  flyway:
+    url: ${DB_JDBC_URL:jdbc:postgresql://localhost:5432/orders}
+    user: ${DB_USERNAME:orders}
+    password: ${DB_PASSWORD:orders}
+  jackson:
+    default-property-inclusion: non_null
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: orders-audit
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.cmanzano.orders.infrastructure.messaging.OrderEventMessage
+        spring.json.trusted.packages: com.cmanzano.orders.infrastructure.messaging
+        spring.json.use.type.headers: false
+
+server:
+  port: 8080
+  shutdown: graceful
+
+app:
+  security:
+    jwt:
+      # Sin valor por defecto a propósito: la aplicación no arranca si no se provee el secreto.
+      secret: ${JWT_SECRET}
+      issuer: ${JWT_ISSUER:orders-service}
+      ttl: 15m
+    users: []
+  payment:
+    base-url: ${PAYMENT_BASE_URL:http://localhost:8089}
+    timeout: 2s
+  aws:
+    dynamodb:
+      region: ${AWS_REGION:us-east-1}
+      endpoint: ${DYNAMODB_ENDPOINT:}
+      audit-table: ${DYNAMODB_AUDIT_TABLE:order_audit}
+      create-table: ${DYNAMODB_CREATE_TABLE:false}
+  kafka:
+    order-events-topic: orders.events
+    replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentGateway:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - com.cmanzano.orders.infrastructure.adapter.out.payment.PaymentProviderServerException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+  retry:
+    instances:
+      paymentGateway:
+        max-attempts: 3
+        wait-duration: 200ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.cmanzano.orders.infrastructure.adapter.out.payment.PaymentProviderServerException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+  bulkhead:
+    instances:
+      paymentGateway:
+        max-concurrent-calls: 20
+        max-wait-duration: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,circuitbreakers,retries
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
