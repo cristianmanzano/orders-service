@@ -1,0 +1,77 @@
+### Peticiones de ejemplo (VS Code REST Client / IntelliJ HTTP Client)
+@baseUrl = http://localhost:8080
+
+### 1. Obtener token como alice (rol USER)
+# @name login
+POST {{baseUrl}}/api/v1/auth/token
+Content-Type: application/json
+
+{ "username": "alice", "password": "alice123" }
+
+###
+@token = {{login.response.body.accessToken}}
+
+### 2. Crear pedido (10 unidades -> descuento por volumen del 10%)
+# @name createOrder
+POST {{baseUrl}}/api/v1/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    { "sku": "MOUSE-01", "quantity": 8 },
+    { "sku": "MONITOR-27", "quantity": 2 }
+  ]
+}
+
+###
+@orderId = {{createOrder.response.body.id}}
+
+### 3. Consultar el pedido
+GET {{baseUrl}}/api/v1/orders/{{orderId}}
+Authorization: Bearer {{token}}
+
+### 4. Pagar el pedido (pasa por Retry + Circuit Breaker + Bulkhead)
+POST {{baseUrl}}/api/v1/orders/{{orderId}}/payment
+Authorization: Bearer {{token}}
+
+### 5. Listar mis pedidos
+GET {{baseUrl}}/api/v1/orders
+Authorization: Bearer {{token}}
+
+### 6. Token de administrador
+# @name adminLogin
+POST {{baseUrl}}/api/v1/auth/token
+Content-Type: application/json
+
+{ "username": "admin", "password": "admin123" }
+
+###
+@adminToken = {{adminLogin.response.body.accessToken}}
+
+### 7. Traza de auditoría (Kafka -> DynamoDB), solo ADMIN
+GET {{baseUrl}}/api/v1/orders/{{orderId}}/audit
+Authorization: Bearer {{adminToken}}
+
+### 8. Estado del circuit breaker de pagos
+GET {{baseUrl}}/actuator/circuitbreakers
+Authorization: Bearer {{adminToken}}
+
+### 9. Pedido de alto valor -> la pasarela simulada lo rechaza (422)
+# @name bigOrder
+POST {{baseUrl}}/api/v1/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "items": [ { "sku": "LAPTOP-14", "quantity": 5 } ] }
+
+###
+POST {{baseUrl}}/api/v1/orders/{{bigOrder.response.body.id}}/payment
+Authorization: Bearer {{token}}
+
+### 10. Validación de entrada (400 con detalle por campo)
+POST {{baseUrl}}/api/v1/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "items": [ { "sku": "bad sku!", "quantity": 0 } ] }

@@ -1,0 +1,24 @@
+# Perfil para desarrollo local y demos (docker-compose). NUNCA usar en producción:
+# contiene un secreto JWT y contraseñas de demostración.
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:wgfkAHournwmnA0/3HLG5/ZJklwppoU8LZrVOlxR5oQyH8y2v9fjRYxPrtlLAL7/}
+    users:
+      - username: alice
+        password: ${ALICE_PASSWORD:alice123}
+        roles: [USER]
+      - username: bob
+        password: ${BOB_PASSWORD:bob123}
+        roles: [USER]
+      - username: admin
+        password: ${ADMIN_PASSWORD:admin123}
+        roles: [USER, ADMIN]
+  aws:
+    dynamodb:
+      endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
+      create-table: ${DYNAMODB_CREATE_TABLE:true}
+
+logging:
+  level:
+    com.cmanzano.orders: DEBUG
