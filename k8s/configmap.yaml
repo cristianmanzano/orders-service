@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orders-service-config
+data:
+  # En AWS estos endpoints apuntarían a servicios gestionados: RDS PostgreSQL, Amazon MSK y DynamoDB.
+  DB_R2DBC_URL: r2dbc:postgresql://orders-postgres:5432/orders
+  DB_JDBC_URL: jdbc:postgresql://orders-postgres:5432/orders
+  KAFKA_BOOTSTRAP_SERVERS: orders-kafka:9092
+  KAFKA_REPLICATION_FACTOR: "3"
+  PAYMENT_BASE_URL: http://payment-provider:8080
+  AWS_REGION: us-east-1
+  DYNAMODB_AUDIT_TABLE: order_audit
+  JWT_ISSUER: orders-service
