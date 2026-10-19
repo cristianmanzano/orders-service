@@ -1,0 +1,18 @@
+{
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "url": "/v1/charges"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "status": "APPROVED",
+      "reference": "PAY-{{randomValue length=10 type='ALPHANUMERIC' uppercase=true}}"
+    },
+    "transformers": ["response-template"]
+  }
+}
