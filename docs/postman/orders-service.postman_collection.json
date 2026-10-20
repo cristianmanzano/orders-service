@@ -1,0 +1,416 @@
+{
+  "info": {
+    "name": "orders-service",
+    "description": "Colección completa de orders-service. Ejecutar en orden (Collection Runner): los scripts guardan tokens e IDs en variables de colección.\n\nRequisitos: `docker compose up -d` + app con perfil `local` (usuarios alice/bob/admin).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "paymentBaseUrl", "value": "http://localhost:8089" },
+    { "key": "token", "value": "" },
+    { "key": "bobToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "cancelOrderId", "value": "" },
+    { "key": "bigOrderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Token alice (USER)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('token', pm.response.json().accessToken);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"alice\",\n  \"password\": \"alice123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "token"] }
+          }
+        },
+        {
+          "name": "Token bob (USER)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('bobToken', pm.response.json().accessToken);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"bob\",\n  \"password\": \"bob123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "token"] }
+          }
+        },
+        {
+          "name": "Token admin (USER, ADMIN)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('adminToken', pm.response.json().accessToken);"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "token"] }
+          }
+        },
+        {
+          "name": "Credenciales inválidas (401)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"alice\",\n  \"password\": \"wrong\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["api", "v1", "auth", "token"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Orders - flujo feliz",
+      "item": [
+        {
+          "name": "Crear pedido (descuento por volumen)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('orderId', pm.response.json().id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"sku\": \"MOUSE-01\", \"quantity\": 8 },\n    { \"sku\": \"MONITOR-27\", \"quantity\": 2 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "Consultar pedido",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] }
+          }
+        },
+        {
+          "name": "Listar mis pedidos",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "Pagar pedido",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('status PAID', () => pm.expect(pm.response.json().status).to.eql('PAID'));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/payment", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "payment"] }
+          }
+        },
+        {
+          "name": "Crear pedido para cancelar",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('cancelOrderId', pm.response.json().id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"sku\": \"KEYBOARD-01\", \"quantity\": 1 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "Cancelar pedido",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('status CANCELLED', () => pm.expect(pm.response.json().status).to.eql('CANCELLED'));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"El cliente cambió de opinión\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{cancelOrderId}}/cancellation", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{cancelOrderId}}", "cancellation"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Orders - errores",
+      "item": [
+        {
+          "name": "Pagar pedido ya pagado (409)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/payment", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "payment"] }
+          }
+        },
+        {
+          "name": "Cancelar pedido pagado (409)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Demasiado tarde\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/cancellation", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "cancellation"] }
+          }
+        },
+        {
+          "name": "Pagar pedido cancelado (409)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{cancelOrderId}}/payment", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{cancelOrderId}}", "payment"] }
+          }
+        },
+        {
+          "name": "Crear pedido de alto valor (> 5000)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('bigOrderId', pm.response.json().id);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"sku\": \"LAPTOP-14\", \"quantity\": 5 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "Pagar pedido alto valor - rechazado por pasarela (422)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('422 Payment rejected', () => pm.response.to.have.status(422));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{bigOrderId}}/payment", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{bigOrderId}}", "payment"] }
+          }
+        },
+        {
+          "name": "Pedido ajeno - bob consulta pedido de alice (404)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{bobToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}"] }
+          }
+        },
+        {
+          "name": "Pedido inexistente (404)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/00000000-0000-0000-0000-000000000000", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "00000000-0000-0000-0000-000000000000"] }
+          }
+        },
+        {
+          "name": "Validación de entrada (400)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"sku\": \"bad sku!\", \"quantity\": 0 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "SKU inexistente (422)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('422 Invalid order', () => pm.response.to.have.status(422));"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"items\": [\n    { \"sku\": \"NOT-EXISTS\", \"quantity\": 1 }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        },
+        {
+          "name": "Sin token (401)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Auditoría (ADMIN)",
+      "item": [
+        {
+          "name": "Traza de auditoría del pedido",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/audit", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "audit"] }
+          }
+        },
+        {
+          "name": "Auditoría como USER (403)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/audit", "host": ["{{baseUrl}}"], "path": ["api", "v1", "orders", "{{orderId}}", "audit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Actuator",
+      "item": [
+        {
+          "name": "Health (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+          }
+        },
+        {
+          "name": "Liveness (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health/liveness", "host": ["{{baseUrl}}"], "path": ["actuator", "health", "liveness"] }
+          }
+        },
+        {
+          "name": "Readiness (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/health/readiness", "host": ["{{baseUrl}}"], "path": ["actuator", "health", "readiness"] }
+          }
+        },
+        {
+          "name": "Info (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/info", "host": ["{{baseUrl}}"], "path": ["actuator", "info"] }
+          }
+        },
+        {
+          "name": "Prometheus (público)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/prometheus", "host": ["{{baseUrl}}"], "path": ["actuator", "prometheus"] }
+          }
+        },
+        {
+          "name": "Circuit breakers (ADMIN)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/circuitbreakers", "host": ["{{baseUrl}}"], "path": ["actuator", "circuitbreakers"] }
+          }
+        },
+        {
+          "name": "Retries (ADMIN)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/retries", "host": ["{{baseUrl}}"], "path": ["actuator", "retries"] }
+          }
+        },
+        {
+          "name": "Métricas (ADMIN)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/actuator/metrics", "host": ["{{baseUrl}}"], "path": ["actuator", "metrics"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Pasarela simulada (WireMock)",
+      "item": [
+        {
+          "name": "Cargo aprobado (directo a WireMock)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "11111111-1111-1111-1111-111111111111" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"11111111-1111-1111-1111-111111111111\",\n  \"amount\": 100.00,\n  \"currency\": \"USD\"\n}" },
+            "url": { "raw": "{{paymentBaseUrl}}/v1/charges", "host": ["{{paymentBaseUrl}}"], "path": ["v1", "charges"] }
+          }
+        },
+        {
+          "name": "Cargo rechazado > 5000 (directo a WireMock)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "22222222-2222-2222-2222-222222222222" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"22222222-2222-2222-2222-222222222222\",\n  \"amount\": 6000.00,\n  \"currency\": \"USD\"\n}" },
+            "url": { "raw": "{{paymentBaseUrl}}/v1/charges", "host": ["{{paymentBaseUrl}}"], "path": ["v1", "charges"] }
+          }
+        },
+        {
+          "name": "Ver stubs cargados (admin WireMock)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{paymentBaseUrl}}/__admin/mappings", "host": ["{{paymentBaseUrl}}"], "path": ["__admin", "mappings"] }
+          }
+        },
+        {
+          "name": "Ver peticiones recibidas (admin WireMock)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{paymentBaseUrl}}/__admin/requests", "host": ["{{paymentBaseUrl}}"], "path": ["__admin", "requests"] }
+          }
+        }
+      ]
+    }
+  ]
+}
