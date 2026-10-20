@@ -107,50 +107,6 @@ src/main/java/com/cmanzano/orders
 
 ---
 
-## Cómo se cubre cada competencia
-
-| Competencia | Dónde verlo |
-|---|---|
-| **POO**: encapsulamiento | `Order` no expone setters; el estado cambia solo con métodos de negocio (`markAsPaid`, `cancel`) que protegen sus invariantes. Colecciones inmutables. |
-| **POO**: herencia | Jerarquía `DomainException` → `InvalidOrderException`, `OrderNotFoundException`... |
-| **POO**: polimorfismo | `OrderStatus` define `canTransitionTo` por constante; implementaciones intercambiables de `DiscountPolicy` y de cada puerto. |
-| **POO**: abstracción | Puertos (`OrderRepositoryPort`, `PaymentGatewayPort`) ocultan PostgreSQL, HTTP, Kafka o DynamoDB. |
-| **Clean / Hexagonal Architecture** | Paquetes `domain` / `application` / `infrastructure`; composition root en `ApplicationConfig`; reglas en `HexagonalArchitectureTest`. |
-| **Spring WebFlux (reactivo)** | Todo el flujo es no bloqueante: WebFlux + R2DBC + WebClient + DynamoDB async. `KafkaTemplate.send` se aísla en `boundedElastic`. |
-| **Programación funcional** | Records inmutables, `DiscountPolicy` como `@FunctionalInterface`, pipelines Reactor, `switch` con pattern matching sobre `sealed`. |
-| **Programación orientada a aspectos** | `UseCaseObservabilityAspect`: mide duración y resultado de cada caso de uso (logs + métrica Micrometer) sin tocar la capa de aplicación. |
-| **JWT** | `JwtTokenService` emite tokens HS256 (15 min, claim `roles`); `SecurityConfig` valida firma, expiración y emisor; autorización por rol con `@PreAuthorize`. |
-| **PostgreSQL** | R2DBC + Flyway, transacción reactiva (`TransactionalOperator`), bloqueo optimista (`@Version`), índices. |
-| **DynamoDB** | Tabla con PK/SK diseñada para el patrón de acceso, escritura idempotente, cliente asíncrono. |
-| **Patrones GoF** | Strategy y Composite (`DiscountPolicy`, `BestDiscountPolicy`), Builder (`Order.Builder`), Factory Method (`Order.create`, `DiscountPolicies`), Adapter (todos los adaptadores), Decorator (operadores Resilience4j). |
-| **Tolerancia a fallos** | `HttpPaymentGatewayAdapter`: Circuit Breaker + Retry con backoff exponencial + Bulkhead + Timeout, e `Idempotency-Key` para evitar cobros dobles. |
-| **EDA (Kafka)** | Eventos publicados con clave `orderId` (orden por pedido), productor idempotente (`acks=all`), consumidor con reintentos y **Dead Letter Topic**. |
-| **Pruebas unitarias (JUnit 5 + Mockito)** | `OrderTest`, `MoneyTest`, `DiscountPolicyTest` (parametrizado), `OrderApplicationServiceTest` (mocks + `StepVerifier`). |
-| **Pruebas de integración** | `OrdersApiIT`: Testcontainers (PostgreSQL, Kafka, DynamoDB Local) + WireMock, flujo HTTP → Kafka → DynamoDB. `HttpPaymentGatewayAdapterTest` con WireMock y Resilience4j real. |
-| **BDD (Cucumber)** | `src/test/resources/features/pedidos.feature` en español, ejecutado contra los casos de uso reales con *fakes* en memoria. |
-| **Docker** | `Dockerfile` multi-stage, jar extraído en capas, imagen **Distroless** `nonroot`. |
-| **Kubernetes** | `k8s/`: Deployment con probes, `readOnlyRootFilesystem`, sin root, HPA, PDB, Kustomize. |
-| **IaC (Terraform)** | `infra/terraform`: DynamoDB (PITR, cifrado), ECR (escaneo al subir, tags inmutables), rol IAM (IRSA) de mínimo privilegio. |
-| **CI/CD (GitHub Actions)** | `.github/workflows/ci.yml`: build + todas las pruebas, escaneo Trivy (dependencias, secretos, IaC, imagen), publicación en GHCR desde `main`. Dependabot. |
-| **Git / GitFlow** | [docs/BRANCHING.md](docs/BRANCHING.md). |
-| **OWASP Top 10** | Ver sección siguiente. |
-
-### Seguridad (OWASP Top 10)
-
-| Riesgo | Mitigación |
-|---|---|
-| A01 Broken Access Control | Un cliente solo accede a sus pedidos (`Requester.canAccess`); para pedidos ajenos se responde **404** y no 403, para no revelar su existencia. Auditoría solo para `ADMIN`. |
-| A02 Cryptographic Failures | Secreto JWT de ≥256 bits inyectado por entorno (la app no arranca sin él); contraseñas con BCrypt. |
-| A03 Injection | Consultas parametrizadas (Spring Data R2DBC); validación de entrada con Bean Validation (SKU con patrón, límites de cantidad y tamaño). |
-| A04 Insecure Design | El precio **nunca** viene del cliente: se toma del catálogo. Descuento acotado al subtotal. |
-| A05 Security Misconfiguration | Errores RFC 9457 sin trazas internas; actuator restringido; contenedor sin root ni shell. |
-| A06 Vulnerable Components | Trivy en CI + Dependabot. |
-| A07 Authentication Failures | Tokens de vida corta, validación de `exp`, `iss` y firma. |
-| A08 Data Integrity | Escaneo de la imagen antes de publicarla; tags inmutables en ECR. |
-| A09 Logging & Monitoring | Logs estructurados por caso de uso, métricas Prometheus, métrica de eventos no publicados. La contraseña se enmascara en `TokenRequest.toString()`. |
-
----
-
 ## Ejecutarlo
 
 **Requisitos:** Java 21, Maven 3.9+, Docker.
